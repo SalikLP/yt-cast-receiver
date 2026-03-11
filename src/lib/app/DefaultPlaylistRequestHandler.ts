@@ -4,6 +4,7 @@ import type Client from './Client.js';
 import type Playlist from './Playlist.js';
 import PlaylistRequestHandler, { type PlaylistPreviousNextVideos } from './PlaylistRequestHandler.js';
 import type Video from './Video.js';
+import type Sender from './Sender.js';
 
 type InnertubeEndpoint = InnertubeLib.YTNodes.NavigationEndpoint;
 
@@ -29,16 +30,22 @@ export default class DefaultPlaylistRequestHandler extends PlaylistRequestHandle
   #innertubeInitialClient: InnertubeLib.Context['client'];
   #innertubeTVClient: InnertubeLib.Context['client'];
   #innertubeMusicClient: InnertubeLib.Context['client'];
+  #getConnectedSendersFn: () => Sender[];
 
-  constructor() {
+  constructor(params: {
+    getConnectedSendersFn: () => Sender[];
+  }) {
     super();
     this.#innertube = null;
+    this.#getConnectedSendersFn = params?.getConnectedSendersFn;
   }
 
   async #init() {
     if (!this.#innertube) {
       // https://github.com/LuanRT/YouTube.js/issues/1043
-      this.#innertube = await Innertube.create();
+      this.#innertube = await Innertube.create({
+        player_id: 'a944b11f'
+      });
       this.#innertubeInitialClient = { ...this.#innertube.session.context.client };
       this.#innertubeTVClient = {
         ...this.#innertube.session.context.client,
@@ -125,7 +132,14 @@ export default class DefaultPlaylistRequestHandler extends PlaylistRequestHandle
     endpoint.payload = {
       videoId: video.id,
       enableMdxAutoplay: true,
-      isMdxPlayback: true
+      isMdxPlayback: true,
+      mdxContext: {
+        mdxReceiverContext: {
+          mdxConnectedDevices: this.#getConnectedSendersFn().map((sender) => ({
+            deviceId: sender.id
+          }))
+        }
+      }
     };
     if (video.context?.playlistId) {
       endpoint.payload.playlistId = video.context.playlistId;

@@ -1068,6 +1068,10 @@ Note: demo uses port 8099.
 
 # Changelog
 
+2.1.1
+- Fix "Failed to extract signature decipher algorithm" error
+- Fix queue missing autoplay video
+
 2.1.0
 - Update YouTube.js lib
 - Disable stream URL fetching in example
