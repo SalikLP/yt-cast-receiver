@@ -4,7 +4,7 @@ import type Client from './Client.js';
 import type Playlist from './Playlist.js';
 import PlaylistRequestHandler, { type PlaylistPreviousNextVideos } from './PlaylistRequestHandler.js';
 import type Video from './Video.js';
-import Sender from './Sender.js';
+import type Sender from './Sender.js';
 
 type InnertubeEndpoint = InnertubeLib.YTNodes.NavigationEndpoint;
 
