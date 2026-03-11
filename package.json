@@ -1,6 +1,6 @@
 {
   "name": "yt-cast-receiver",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "type": "module",
   "description": "YouTube Cast Receiver for Node. Supports casting from YouTube and YouTube Music.",
   "scripts": {
@@ -36,17 +36,17 @@
     "@types/uuid": "^9.0.1",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
+    "blessed": "^0.1.81",
     "eslint": "^9.15.0",
-    "eslint-plugin-tsdoc": "^0.4.0",
+    "eslint-plugin-tsdoc": "^0.5.2",
     "eslint-plugin-unused-imports": "^4.1.4",
+    "timer-node": "^5.0.7",
     "tsx": "^4.19.2",
     "typedoc": "^0.28.14",
     "typedoc-plugin-markdown": "^4.9.0",
     "typedoc-plugin-rename-defaults": "^0.7.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.2",
-    "blessed": "^0.1.81",
-    "timer-node": "^5.0.7"
+    "typescript-eslint": "^8.46.2"
   },
   "dependencies": {
     "@patrickkfkan/peer-dial": "^0.1.3",
