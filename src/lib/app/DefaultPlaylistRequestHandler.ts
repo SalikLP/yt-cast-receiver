@@ -43,9 +43,7 @@ export default class DefaultPlaylistRequestHandler extends PlaylistRequestHandle
   async #init() {
     if (!this.#innertube) {
       // https://github.com/LuanRT/YouTube.js/issues/1043
-      this.#innertube = await Innertube.create({
-        player_id: 'a944b11f'
-      });
+      this.#innertube = await Innertube.create();
       this.#innertubeInitialClient = { ...this.#innertube.session.context.client };
       this.#innertubeTVClient = {
         ...this.#innertube.session.context.client,
@@ -123,7 +121,7 @@ export default class DefaultPlaylistRequestHandler extends PlaylistRequestHandle
     }
   }
 
-  #createInnertubeEndpoint(video: Video, noClient = false): InnertubeEndpoint {
+  #createInnertubeEndpoint(video: Video, noClient = false, noMdxContext = false): InnertubeEndpoint {
     if (!this.#innertube) {
       throw Error('DefaultPlaylistRequestHandler not initialized.');
     }
@@ -133,14 +131,16 @@ export default class DefaultPlaylistRequestHandler extends PlaylistRequestHandle
       videoId: video.id,
       enableMdxAutoplay: true,
       isMdxPlayback: true,
-      mdxContext: {
+    };
+    if (!noMdxContext) {
+      endpoint.payload.mdxContext = {
         mdxReceiverContext: {
           mdxConnectedDevices: this.#getConnectedSendersFn().map((sender) => ({
             deviceId: sender.id
           }))
         }
       }
-    };
+    }
     if (video.context?.playlistId) {
       endpoint.payload.playlistId = video.context.playlistId;
     }
@@ -236,7 +236,7 @@ export default class DefaultPlaylistRequestHandler extends PlaylistRequestHandle
     const isMusic = video.client === CLIENTS.YTMUSIC;
     this.#configureInnertubeContext(video, isMusic ? 'music' : 'initial');
 
-    const endpoint = this.#createInnertubeEndpoint(run === 1 ? video : {...video, context: undefined});
+    const endpoint = this.#createInnertubeEndpoint(run === 1 ? video : {...video, context: undefined}, false, true);
     const payload = endpoint.payload;
 
     try {
@@ -281,6 +281,7 @@ export default class DefaultPlaylistRequestHandler extends PlaylistRequestHandle
         return await this.markWatched(video, 2);
       }
 
+      console.log('playability status:', JSON.stringify(playerResponse.data?.playabilityStatus))
       throw Error('No playback tracking URL found');
 
     }
