@@ -1069,8 +1069,9 @@ Note: demo uses port 8099.
 # Changelog
 
 2.1.1
-- Fix "Failed to extract signature decipher algorithm" error
+- Update YouTube.js lib
 - Fix queue missing autoplay video
+- Skip mdx context creation when marking video watched
 
 2.1.0
 - Update YouTube.js lib
