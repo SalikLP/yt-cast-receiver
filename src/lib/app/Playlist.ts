@@ -90,8 +90,10 @@ export default class Playlist extends EventEmitter {
    *
    * Updates the playlist with payload of 'setPlaylist' or 'updatePlaylist' message.
    * @param data - 'setPlaylist' or 'updatePlaylist' `Message` object.
+   * @param onApplied - Called once the message has been applied to the playlist (current video set),
+   * before previous / next videos are fetched from the request handler.
    */
-  async updateByMessage(message: Message, client: Client) {
+  async updateByMessage(message: Message, client: Client, onApplied?: () => void) {
     if (message.name !== 'setPlaylist' && message.name !== 'updatePlaylist') {
       return;
     }
@@ -153,6 +155,8 @@ export default class Playlist extends EventEmitter {
         this.#current = null;
       }
     }
+
+    onApplied?.();
 
     await this.#refreshPreviousNext();
 

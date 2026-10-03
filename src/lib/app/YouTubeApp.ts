@@ -15,6 +15,7 @@ import { type ValueOf } from '../utils/Type.js';
 import type PlaylistRequestHandler from './PlaylistRequestHandler.js';
 import DefaultPlaylistRequestHandler from './DefaultPlaylistRequestHandler.js';
 import { type ClientKey } from './Client.js';
+import type Video from './Video.js';
 import type DataStore from '../utils/DataStore.js';
 
 export interface AppOptions {
@@ -446,7 +447,11 @@ export default class YouTubeApp extends EventEmitter implements dial.App {
           stateBeforeSet.autoplay = null;
         }
         const navBeforeSet = this.#player.getNavInfo();
-        await this.#player.queue.updateByMessage(message, client);
+        await this.#player.queue.updateByMessage(message, client, () => {
+          if (message.name === 'setPlaylist') {
+            this.#sendEarlyLoadingState(session, AID, stateBeforeSet.current, payload.currentTime);
+          }
+        });
         const stateAfterSet = this.#player.queue.getState();
         const navAfterSet = this.#player.getNavInfo();
         if (stateBeforeSet.autoplay?.id !== stateAfterSet.autoplay?.id) {
@@ -541,6 +546,32 @@ export default class YouTubeApp extends EventEmitter implements dial.App {
       session.sendMessage(sendMessages)
         .catch((error: unknown) => this.#logger.error('[yt-cast-receiver] Caught error sending message:', error));;
     }
+  }
+
+  /**
+   * Tells senders right away that the new current video is loading, without waiting for the
+   * playlist request handler (previous / next videos) or the player. Senders may give up on a
+   * cast if no state naming the video arrives within a few seconds of 'setPlaylist'.
+   */
+  #sendEarlyLoadingState(session: Session, AID: number | null, currentBefore: Video | null, currentTime: string | undefined) {
+    const queue = this.#player.queue.getState();
+    const current = queue.current;
+    if (!current || this.#connectedSenders.length === 0 ||
+      (currentBefore?.id === current.id && currentBefore?.context?.index === current.context?.index)) {
+      return;
+    }
+    const state: PlayerState = {
+      status: PLAYER_STATUSES.LOADING,
+      queue,
+      position: parseInt(currentTime || '', 10) || 0,
+      duration: 0,
+      // Not used by 'nowPlaying' / 'onStateChange'; avoids querying the player.
+      volume: { level: 0, muted: false },
+      cpn: this.#player.cpn
+    };
+    this.#logger.debug(`[yt-cast-receiver] (AID: ${AID}) Sending early loading state for video ${current.id}.`);
+    session.sendMessage([ new Message.NowPlaying(AID, state), new Message.OnStateChange(AID, state) ])
+      .catch((error: unknown) => this.#logger.error('[yt-cast-receiver] Caught error sending message:', error));
   }
 
   async #handleSenderConnected(sender: Sender, session: Session, AID: number | null): Promise<Message[]> {
