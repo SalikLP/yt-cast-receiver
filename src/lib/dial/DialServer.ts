@@ -22,6 +22,12 @@ export interface DialOptions {
   modelName?: string;
   bindToInterfaces?: string[];
   bindToAddresses?: string[];
+  /**
+   * UUID advertised as the device's UDN (device description and SSDP). Pass a persisted value
+   * so senders recognize the receiver across restarts instead of listing it twice.
+   * @default a random v4 UUID, new on every start
+   */
+  uuid?: string;
   logger: Logger;
 }
 
@@ -75,7 +81,8 @@ function createDelegate(apps: Record<string, dial.App>, logger: Logger): dial.De
  */
 export default class DialServer {
 
-  #dialOptions: Record<string, any> & dial.ServerOptions;
+  // `@types/peer-dial` types `uuid` as node-uuid options, but peer-dial uses it as the UUID string.
+  #dialOptions: Record<string, any> & Omit<dial.ServerOptions, 'uuid'> & { uuid?: string };
   #expressServer: http.Server;
   #dialServer: dial.Server;
   #logger: Logger;
@@ -95,9 +102,10 @@ export default class DialServer {
       modelName: options.modelName || CONF_DEFAULTS.MODEL,
       delegate: createDelegate({'YouTube': app}, this.#logger),
       bindToInterfaces: options.bindToInterfaces,
-      bindToAddresses: options.bindToAddresses
+      bindToAddresses: options.bindToAddresses,
+      uuid: options.uuid
     };
-    this.#dialServer = new dial.Server(this.#dialOptions);
+    this.#dialServer = new dial.Server(this.#dialOptions as dial.ServerOptions);
     this.#expressServer = http.createServer(expressApp);
     this.#status = STATUSES.STOPPED;
   }
