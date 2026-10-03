@@ -190,10 +190,14 @@ export default class YouTubeApp extends EventEmitter implements dial.App {
   async launch(data: string): Promise<string> {
     const launchData = queryString.parse(data);
     this.#logger.debug('[yt-cast-receiver] YouTubeApp received DIAL launch request. Launch data:', launchData);
-    const { pairingCode: pairingCodeData, theme: themeData } = launchData;
+    const { pairingCode: pairingCodeData, theme: themeData, topic: topicData } = launchData;
     const pairingCode = Array.isArray(pairingCodeData) ? pairingCodeData[0] : pairingCodeData;
     const theme = (Array.isArray(themeData) ? themeData[0] : themeData);
-    const session = Object.values(this.#sessions).find((s) => s.client.theme === theme);
+    const topic = (Array.isArray(topicData) ? topicData[0] : topicData);
+    // YouTube Music senders may launch with `theme=cl&topic=music` (instead of `theme=m`).
+    // They must still pair with the YouTube Music Lounge screen, or they ignore our state updates.
+    const sessionTheme = topic === 'music' ? CLIENTS.YTMUSIC.theme : theme;
+    const session = Object.values(this.#sessions).find((s) => s.client.theme === sessionTheme);
     if (pairingCode && session) {
       await this.#checkAndSwitchActiveSession(session);
       this.#logger.info('[yt-cast-receiver] Connecting sender through DIAL...');
@@ -207,7 +211,7 @@ export default class YouTubeApp extends EventEmitter implements dial.App {
     }
 
     throw new AppError('Failed to launch YouTubeApp',
-      new IncompleteAPIDataError(`Invalid launch data. Unknown theme: ${theme}`));
+      new IncompleteAPIDataError(`Invalid launch data. Unknown theme: ${theme} (topic: ${topic})`));
   }
 
   async #checkAndSwitchActiveSession(targetSession: Session) {
