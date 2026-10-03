@@ -8,6 +8,7 @@
     "prepare": "rm -rf dist && npm run build",
     "lint": "npx eslint ./src && npx eslint ./example",
     "lint:fix": "npx eslint ./src --fix && npx eslint ./example --fix",
+    "test": "vitest run",
     "doc": "npx typedoc",
     "example": "npx tsx ./example/index.ts",
     "example:no-ui": "npx tsx ./example/index.ts --no-ui"
@@ -46,7 +47,8 @@
     "typedoc-plugin-markdown": "^4.9.0",
     "typedoc-plugin-rename-defaults": "^0.7.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.2"
+    "typescript-eslint": "^8.46.2",
+    "vitest": "^3.2.7"
   },
   "dependencies": {
     "@patrickkfkan/peer-dial": "^0.1.3",
