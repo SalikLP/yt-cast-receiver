@@ -94,7 +94,7 @@ export default class Session extends EventEmitter {
   #client: Client;
   #screen: Screen;
   #bindParams: BindParams;
-  #rpcConnection: RPCConnection;
+  #rpcConnection: RPCConnection | null = null;
   #ofs: number;
   #dataStore: DataStore | null;
   #logger: Logger;
@@ -106,6 +106,7 @@ export default class Session extends EventEmitter {
   #loungeTokenRefreshTimer: NodeJS.Timeout | null;
   #pairingCodeRequestService: PairingCodeRequestService;
   #status: SessionStatus;
+  #refreshPromise: Promise<void> | null = null;
 
   constructor(options: SessionOptions) {
     super();
@@ -227,19 +228,22 @@ export default class Session extends EventEmitter {
 
     if (!error) {
 
-      this.#rpcConnection = new RPCConnection({
+      // Never keep more than one RPC connection: they would share the same SID and evict each other.
+      this.#closeRPCConnection();
+
+      const rpcConnection = this.#rpcConnection = new RPCConnection({
         bindParams: this.#bindParams,
         logger: this.#logger
       });
 
-      this.#rpcConnection.on('messages', this.#handleMessage.bind(this));
-      this.#rpcConnection.on('terminate', (error) => {
+      rpcConnection.on('messages', this.#handleMessage.bind(this));
+      rpcConnection.on('terminate', (error) => {
         this.#logger.error(`[yt-cast-receiver] (${this.#client.name}) RPC connection terminated due to error:`, error);
         this.#refreshLoungeToken().catch((error: unknown) => this.#logger.error('[yt-cast-receiver] Caught error refreshing lounge token:', error));
       });
 
       try {
-        await this.#rpcConnection.connect();
+        await rpcConnection.connect();
         this.#logger.debug(`[yt-cast-receiver] (${this.#client.name}) Session established.`);
 
         if (!isRefreshing) {
@@ -286,10 +290,7 @@ export default class Session extends EventEmitter {
 
     try {
       this.#pairingCodeRequestService.stop();
-      if (this.#rpcConnection) {
-        this.#rpcConnection.removeAllListeners();
-        this.#rpcConnection.close();
-      }
+      this.#closeRPCConnection();
       this.#taskQueue.clear();
       this.#clearDeferredMessages();
       try {
@@ -317,13 +318,28 @@ export default class Session extends EventEmitter {
     }
   }
 
-  async #refreshLoungeToken() {
+  /**
+   * Single-flight: concurrent callers (lounge token timer, RPC `terminate`, failed
+   * `SendMessageTask`) share the refresh already in progress.
+   */
+  #refreshLoungeToken(): Promise<void> {
+    if (!this.#refreshPromise) {
+      this.#refreshPromise = this.#doRefreshLoungeToken().finally(() => {
+        this.#refreshPromise = null;
+      });
+    }
+    return this.#refreshPromise;
+  }
+
+  async #doRefreshLoungeToken() {
     this.#status = 'refreshing';
     this.#logger.debug(`[yt-cast-receiver] (${this.#client.name}) Refreshing lounge token...`);
 
     this.#clearLoungeTokenRefreshTimer();
 
-    const oldRPC = this.#rpcConnection;
+    // Close old RPC connection before `begin()` creates the new one.
+    this.#logger.debug(`[yt-cast-receiver] (${this.#client.name}) Closing old RPC connection...`);
+    this.#closeRPCConnection();
 
     this.#taskQueue.setAutoStart(false);
     this.#taskQueue.stop();
@@ -339,10 +355,12 @@ export default class Session extends EventEmitter {
     catch (error) {
       throw new SessionError(`(${this.#client.name}) Error while refreshing lounge token`, error);
     }
-    finally {
-      this.#logger.debug(`[yt-cast-receiver] (${this.#client.name}) Closing old RPC connection...`);
-      oldRPC.removeAllListeners();
-      oldRPC.close();
+
+    if (this.#isEnded()) {
+      // Session ended while refreshing - don't revive it.
+      this.#closeRPCConnection();
+      this.#taskQueue.setAutoStart(true); // Let `end()` send its pending message
+      return;
     }
 
     if (pairingCodeRequestServiceStatus === STATUSES.RUNNING) {
@@ -363,6 +381,18 @@ export default class Session extends EventEmitter {
 
     this.#taskQueue.setAutoStart(true);
     this.#status = STATUSES.RUNNING;
+  }
+
+  #isEnded() {
+    return this.#status === STATUSES.STOPPING || this.#status === STATUSES.STOPPED;
+  }
+
+  #closeRPCConnection() {
+    if (this.#rpcConnection) {
+      this.#rpcConnection.removeAllListeners();
+      this.#rpcConnection.close();
+      this.#rpcConnection = null;
+    }
   }
 
   #clearDeferredMessages() {
@@ -596,6 +626,7 @@ export default class Session extends EventEmitter {
 
     if (response.ok) {
       resolve(true);
+      return;
     }
 
     reject(new BadResponseError(`(${this.#client.name}) Bad response received for ${debugMsgNameStr}${AID ? ` (AID: ${AID})` : ''}`, url, response));

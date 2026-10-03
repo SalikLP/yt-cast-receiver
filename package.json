@@ -8,10 +8,10 @@
     "prepare": "rm -rf dist && npm run build",
     "lint": "npx eslint ./src && npx eslint ./example",
     "lint:fix": "npx eslint ./src --fix && npx eslint ./example --fix",
+    "test": "vitest run",
     "doc": "npx typedoc",
     "example": "npx tsx ./example/index.ts",
-    "example:no-ui": "npx tsx ./example/index.ts --no-ui",
-    "test": "vitest run"
+    "example:no-ui": "npx tsx ./example/index.ts --no-ui"
   },
   "exports": "./dist/index.js",
   "types": "./dist/index.d.ts",
